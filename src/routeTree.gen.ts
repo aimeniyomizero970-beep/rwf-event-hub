@@ -16,6 +16,7 @@ import { Route as ContactRouteImport } from './routes/contact'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as VenuesRouteImport } from './routes/venues'
+import { Route as DashboardCustomerRouteImport } from './routes/dashboard/customer'
 import { Route as EventsIndexRouteImport } from './routes/events/index'
 import { Route as EventsEventIdRouteImport } from './routes/events/$eventId'
 
@@ -54,6 +55,11 @@ const VenuesRoute = VenuesRouteImport.update({
   path: '/venues',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DashboardCustomerRoute = DashboardCustomerRouteImport.update({
+  id: '/dashboard/customer',
+  path: '/dashboard/customer',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EventsIndexRoute = EventsIndexRouteImport.update({
   id: '/events/',
   path: '/events/',
@@ -73,6 +79,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/venues': typeof VenuesRoute
+  '/dashboard/customer': typeof DashboardCustomerRoute
   '/events/$eventId': typeof EventsEventIdRoute
   '/events/': typeof EventsIndexRoute
 }
@@ -84,6 +91,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/venues': typeof VenuesRoute
+  '/dashboard/customer': typeof DashboardCustomerRoute
   '/events/$eventId': typeof EventsEventIdRoute
   '/events': typeof EventsIndexRoute
 }
@@ -96,6 +104,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/venues': typeof VenuesRoute
+  '/dashboard/customer': typeof DashboardCustomerRoute
   '/events/$eventId': typeof EventsEventIdRoute
   '/events/': typeof EventsIndexRoute
 }
@@ -109,6 +118,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/venues'
+    | '/dashboard/customer'
     | '/events/$eventId'
     | '/events/'
   fileRoutesByTo: FileRoutesByTo
@@ -120,6 +130,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/venues'
+    | '/dashboard/customer'
     | '/events/$eventId'
     | '/events'
   id:
@@ -131,6 +142,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/venues'
+    | '/dashboard/customer'
     | '/events/$eventId'
     | '/events/'
   fileRoutesById: FileRoutesById
@@ -143,6 +155,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
   VenuesRoute: typeof VenuesRoute
+  DashboardCustomerRoute: typeof DashboardCustomerRoute
   EventsEventIdRoute: typeof EventsEventIdRoute
   EventsIndexRoute: typeof EventsIndexRoute
 }
@@ -198,6 +211,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VenuesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dashboard/customer': {
+      id: '/dashboard/customer'
+      path: '/dashboard/customer'
+      fullPath: '/dashboard/customer'
+      preLoaderRoute: typeof DashboardCustomerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/events/': {
       id: '/events/'
       path: '/events'
@@ -223,6 +243,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
   VenuesRoute: VenuesRoute,
+  DashboardCustomerRoute: DashboardCustomerRoute,
   EventsEventIdRoute: EventsEventIdRoute,
   EventsIndexRoute: EventsIndexRoute,
 }

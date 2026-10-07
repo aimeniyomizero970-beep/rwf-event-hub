@@ -59,6 +59,7 @@ export function BookingModal({
   const [method, setMethod] = React.useState<PaymentMethod>("MTN MoMo");
   const [attendee, setAttendee] = React.useState(currentUser?.name ?? "");
   const [processing, setProcessing] = React.useState(false);
+  const [paymentNotice, setPaymentNotice] = React.useState<{ status: string; message: string; instructions?: string } | null>(null);
   const [result, setResult] = React.useState<{ booking: Booking; tickets: Ticket[] } | null>(null);
 
   React.useEffect(() => {
@@ -70,6 +71,7 @@ export function BookingModal({
     setAttendee(currentUser?.name ?? "");
     setResult(null);
     setProcessing(false);
+    setPaymentNotice(null);
   }, [open, initialTierId, event.tiers, currentUser?.name]);
 
   const tier = event.tiers.find((t) => t.id === tierId);
@@ -78,25 +80,71 @@ export function BookingModal({
   const fee = Math.round(subtotal * 0.03);
   const total = subtotal + fee;
 
-  const confirm = () => {
+  const confirm = async () => {
     if (!tier) return;
     if (qty > available) {
       toast.error("Not enough tickets available in this tier");
       return;
     }
+
     setProcessing(true);
-    setTimeout(() => {
-      const res = checkout({
-        eventId: event.id,
-        items: [{ tierId: tier.id, tierName: tier.name, qty, price: tier.price }],
-        paymentMethod: method,
-        attendeeName: attendee.trim() || currentUser?.name || "Guest",
+    setPaymentNotice(null);
+
+    try {
+      const response = await fetch("/api/payments/create", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          eventId: event.id,
+          amount: total,
+          currency: "RWF",
+          paymentMethod: method,
+          attendeeName: attendee.trim() || currentUser?.name || "Guest",
+          tierName: tier.name,
+          qty,
+        }),
       });
-      setResult(res);
+
+      const data = await response.json();
+
+      if (!response.ok || data.status === "failed") {
+        const message = data.message ?? "Payment could not be processed.";
+        setPaymentNotice({ status: data.status ?? "failed", message });
+        toast.error(message);
+        setProcessing(false);
+        return;
+      }
+
+      if (data.status === "pending_manual_confirmation" || data.status === "pending_provider_setup") {
+        setPaymentNotice({
+          status: data.status,
+          message: data.message,
+          instructions: data.instructions,
+        });
+        toast.info(data.message);
+        setProcessing(false);
+        return;
+      }
+
+      if (data.status === "approved") {
+        const res = checkout({
+          eventId: event.id,
+          items: [{ tierId: tier.id, tierName: tier.name, qty, price: tier.price }],
+          paymentMethod: method,
+          attendeeName: attendee.trim() || currentUser?.name || "Guest",
+        });
+        setResult(res);
+        setProcessing(false);
+        setStep(4);
+        toast.success(`Payment approved — ${res.tickets.length} ticket(s) issued`);
+        return;
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Unable to process payment right now.");
+    } finally {
       setProcessing(false);
-      setStep(4);
-      toast.success(`Payment approved — ${res.tickets.length} ticket(s) issued`);
-    }, 1200);
+    }
   };
 
   return (
@@ -219,7 +267,7 @@ export function BookingModal({
 
         {step === 3 ? (
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">Select a payment method (simulation).</p>
+            <p className="text-sm text-muted-foreground">Select a payment method to process the reservation.</p>
             <RadioGroup value={method} onValueChange={(v) => setMethod(v as PaymentMethod)} className="space-y-2">
               {METHODS.map((m) => (
                 <Label
@@ -240,6 +288,15 @@ export function BookingModal({
                 </Label>
               ))}
             </RadioGroup>
+
+            {paymentNotice ? (
+              <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm">
+                <p className="font-semibold text-amber-700">{paymentNotice.message}</p>
+                {paymentNotice.instructions ? (
+                  <p className="mt-2 text-xs text-muted-foreground">{paymentNotice.instructions}</p>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         ) : null}
 

@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Link } from "@tanstack/react-router";
-import { Check, CreditCard, Download, Minus, Plus, Printer, Smartphone, Wallet } from "lucide-react";
+import { Check, CreditCard, Download, Landmark, Minus, Plus, Printer, Smartphone, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,9 +18,24 @@ import { cn } from "@/lib/utils";
 
 const STEPS = ["Ticket tier", "Quantity", "Summary", "Payment", "Confirmation"];
 
+const bankName = import.meta.env.VITE_BANK_NAME ?? "BK";
+const bankAccount = import.meta.env.VITE_BANK_ACCOUNT ?? "100258706767";
+const momoAccount = import.meta.env.VITE_MOMO_ACCOUNT ?? "1256231";
+const momoPhone = import.meta.env.VITE_MOMO_PHONE ?? "0798528250";
+
 const METHODS: { value: PaymentMethod; hint: string; icon: React.ReactNode }[] = [
   { value: "MTN MoMo", hint: "Mobile money prompt to your MTN line", icon: <Smartphone className="size-4" /> },
   { value: "Airtel Money", hint: "Mobile money prompt to your Airtel line", icon: <Smartphone className="size-4" /> },
+  {
+    value: "Bank transfer",
+    hint: `Transfer to ${bankName} account ${bankAccount}`,
+    icon: <Landmark className="size-4" />,
+  },
+  {
+    value: "MoMo Pay",
+    hint: `MoMo account ${momoAccount} / ${momoPhone}`,
+    icon: <Wallet className="size-4" />,
+  },
   { value: "Card", hint: "Visa / Mastercard secure checkout", icon: <CreditCard className="size-4" /> },
   { value: "Cash", hint: "Pay at an authorised EMBS agent", icon: <Wallet className="size-4" /> },
 ];

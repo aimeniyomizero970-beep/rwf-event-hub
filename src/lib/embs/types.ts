@@ -55,7 +55,7 @@ export interface EventItem {
   tiers: TicketTier[];
 }
 
-export type PaymentMethod = "MTN MoMo" | "Airtel Money" | "Card" | "Cash";
+export type PaymentMethod = "MTN MoMo" | "Airtel Money" | "Bank transfer" | "MoMo Pay" | "Card" | "Cash";
 export type BookingStatus = "confirmed" | "pending" | "cancelled";
 
 export interface BookingItem {

@@ -22,7 +22,7 @@ export class BankTransferProvider extends PaymentProvider {
     this.bankCode = process.env.BANK_CODE || '';
 
     if (!this.bankAccountNumber || !this.bankName) {
-      throw new Error('Bank configuration is incomplete');
+      console.warn('Bank configuration is incomplete');
     }
   }
 

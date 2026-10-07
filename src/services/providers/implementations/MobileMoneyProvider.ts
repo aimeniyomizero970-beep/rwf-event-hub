@@ -23,7 +23,7 @@ export class MobileMoneyProvider extends PaymentProvider {
     this.businessKey = process.env.MOBILE_MONEY_BUSINESS_KEY || '';
 
     if (!this.apiKey || !this.apiUrl || !this.businessKey) {
-      throw new Error('Mobile Money configuration is incomplete');
+      console.warn('Mobile Money configuration is incomplete');
     }
   }
 
@@ -49,7 +49,7 @@ export class MobileMoneyProvider extends PaymentProvider {
           externalId: transactionId,
           partyIdType: 'MSISDN',
           description: `Event booking - Transaction ${transactionId}`,
-          callbackUrl: `${process.env.API_URL}/api/payment/mobile-money/callback`,
+          callbackUrl: `${process.env.API_URL}/api/payment/webhook/mobile-money`,
         },
         {
           headers: {

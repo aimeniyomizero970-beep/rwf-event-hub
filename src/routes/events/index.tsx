@@ -39,7 +39,7 @@ export const Route = createFileRoute("/events/")({
 
 function EventsPage() {
   const search = Route.useSearch();
-  const navigate = useNavigate({ from: "/events" });
+  const navigate = useNavigate({ from: "/events/" });
   const { events, categories, venues } = useEmbs();
 
   const [q, setQ] = React.useState(search.q ?? "");
@@ -72,7 +72,7 @@ function EventsPage() {
     setFrom("");
     setTo("");
     setMaxPrice(250000);
-    void navigate({ search: {} });
+    void navigate({ search: {} as never });
   };
 
   return (

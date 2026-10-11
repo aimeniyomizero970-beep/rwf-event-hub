@@ -156,7 +156,7 @@ function CategoriesTab() {
             </div>
           ) : null}
           <DialogFooter>
-            <Button onClick={() => { if (!edit?.name.trim()) return toast.error("Name is required"); saveCategory(edit); setEdit(null); toast.success("Category saved"); }}>Save</Button>
+            <Button onClick={() => { if (!edit?.name.trim()) { toast.error("Name is required"); return; } saveCategory(edit); setEdit(null); toast.success("Category saved"); }}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -203,7 +203,7 @@ function VenuesTab() {
             </div>
           ) : null}
           <DialogFooter>
-            <Button onClick={() => { if (!edit?.name.trim()) return toast.error("Name is required"); saveVenue(edit); setEdit(null); toast.success("Venue saved"); }}>Save</Button>
+            <Button onClick={() => { if (!edit?.name.trim()) { toast.error("Name is required"); return; } saveVenue(edit); setEdit(null); toast.success("Venue saved"); }}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -272,7 +272,7 @@ function ReportsTab() {
         <h3 className="mb-1 text-lg font-semibold capitalize">{kind} report</h3>
         <p className="mb-4 text-sm text-muted-foreground">{from} to {to} · {kind === "revenue" ? `Total ${rwf(total)}` : `${total} records`}</p>
         <Table>
-          <TableHeader><TableRow>{rows[0].map((h) => <TableHead key={String(h)}>{h}</TableHead>)}</TableRow></TableHeader>
+          <TableHeader><TableRow>{(rows[0] ?? []).map((h) => <TableHead key={String(h)}>{h}</TableHead>)}</TableRow></TableHeader>
           <TableBody>
             {rows.slice(1).map((r, i) => (
               <TableRow key={i}>{r.map((c, j) => <TableCell key={j}>{typeof c === "number" && kind === "revenue" ? rwf(c) : c}</TableCell>)}</TableRow>

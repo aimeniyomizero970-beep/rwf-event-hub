@@ -18,6 +18,21 @@ import type {
 
 const STORAGE_KEY = "embs-state-v1";
 
+function eventPayload(event: EventItem) {
+  return {
+    title: event.title,
+    description: event.description,
+    categoryId: event.categoryId,
+    venueId: event.venueId,
+    date: event.date,
+    endTime: event.endTime,
+    banner: event.banner,
+    status: event.status,
+    featured: event.featured,
+    tiers: event.tiers.map((t) => ({ name: t.name, price: t.price, capacity: t.capacity })),
+  };
+}
+
 interface CheckoutInput {
   eventId: string;
   items: BookingItem[];
@@ -253,21 +268,41 @@ export function EmbsProvider({ children }: { children: React.ReactNode }) {
           ...s,
           tickets: s.tickets.map((t) => (t.id === ticketId ? { ...t, checkedIn: !t.checkedIn } : t)),
         })),
-      saveEvent: (event) =>
+      saveEvent: (event) => {
+        const exists = state.events.some((e) => e.id === event.id);
         setState((s) => ({
           ...s,
-          events: s.events.some((e) => e.id === event.id)
+          events: exists
             ? s.events.map((e) => (e.id === event.id ? event : e))
             : [event, ...s.events],
-        })),
-      deleteEvent: (id) => setState((s) => ({ ...s, events: s.events.filter((e) => e.id !== id) })),
-      updateEventStatus: (id, status) =>
-        setState((s) => ({ ...s, events: s.events.map((e) => (e.id === id ? { ...e, status } : e)) })),
-      toggleFeatured: (id) =>
+        }));
+        if (backendReady) {
+          const payload = eventPayload(event);
+          const call = exists ? api.updateEvent(event.id, payload) : api.createEvent(payload);
+          void call.then(() => refreshFromBackend()).catch(() => {});
+        }
+      },
+      deleteEvent: (id) => {
+        setState((s) => ({ ...s, events: s.events.filter((e) => e.id !== id) }));
+        if (backendReady) void api.deleteEvent(id).then(() => refreshFromBackend()).catch(() => {});
+      },
+      updateEventStatus: (id, status) => {
+        setState((s) => ({ ...s, events: s.events.map((e) => (e.id === id ? { ...e, status } : e)) }));
+        if (backendReady) void api.updateEvent(id, { status }).then(() => refreshFromBackend()).catch(() => {});
+      },
+      toggleFeatured: (id) => {
+        const current = state.events.find((e) => e.id === id);
         setState((s) => ({
           ...s,
           events: s.events.map((e) => (e.id === id ? { ...e, featured: !e.featured } : e)),
-        })),
+        }));
+        if (backendReady && current) {
+          void api
+            .updateEvent(id, { featured: !current.featured })
+            .then(() => refreshFromBackend())
+            .catch(() => {});
+        }
+      },
       toggleUserStatus: (id) =>
         setState((s) => ({
           ...s,

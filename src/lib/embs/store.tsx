@@ -114,10 +114,11 @@ export function EmbsProvider({ children }: { children: React.ReactNode }) {
     if (!ready) return;
 
     try {
-      const [cats, vens, evs, meRes] = await Promise.all([
+      const [cats, vens, evs, revs, meRes] = await Promise.all([
         api.listCategories(),
         api.listVenues(),
         api.listEvents(),
+        api.listReviews(),
         api.me(),
       ]);
 
@@ -131,6 +132,9 @@ export function EmbsProvider({ children }: { children: React.ReactNode }) {
         }
         if (evs.ok && Array.isArray(evs.data)) {
           next.events = evs.data as EventItem[];
+        }
+        if (revs.ok && Array.isArray(revs.data) && revs.data.length > 0) {
+          next.reviews = revs.data as Review[];
         }
         const apiUser = meRes.ok ? ((meRes.data as { user?: User } | null)?.user ?? null) : null;
         if (apiUser) {
@@ -315,31 +319,72 @@ export function EmbsProvider({ children }: { children: React.ReactNode }) {
           ...s,
           users: s.users.map((u) => (u.id === s.currentUserId ? { ...u, ...patch } : u)),
         })),
-      saveCategory: (category) =>
+      saveCategory: (category) => {
+        const exists = state.categories.some((c) => c.id === category.id);
         setState((s) => ({
           ...s,
-          categories: s.categories.some((c) => c.id === category.id)
+          categories: exists
             ? s.categories.map((c) => (c.id === category.id ? category : c))
             : [...s.categories, category],
-        })),
-      deleteCategory: (id) =>
-        setState((s) => ({ ...s, categories: s.categories.filter((c) => c.id !== id) })),
-      saveVenue: (venue) =>
+        }));
+        if (backendReady) {
+          const payload = {
+            name: category.name,
+            slug: category.slug,
+            description: category.description,
+            image: category.image,
+          };
+          const call = exists ? api.updateCategory(category.id, payload) : api.createCategory(payload);
+          void call.then(() => refreshFromBackend()).catch(() => {});
+        }
+      },
+      deleteCategory: (id) => {
+        setState((s) => ({ ...s, categories: s.categories.filter((c) => c.id !== id) }));
+        if (backendReady) void api.deleteCategory(id).then(() => refreshFromBackend()).catch(() => {});
+      },
+      saveVenue: (venue) => {
+        const exists = state.venues.some((v) => v.id === venue.id);
         setState((s) => ({
           ...s,
-          venues: s.venues.some((v) => v.id === venue.id)
+          venues: exists
             ? s.venues.map((v) => (v.id === venue.id ? venue : v))
             : [...s.venues, venue],
-        })),
-      deleteVenue: (id) => setState((s) => ({ ...s, venues: s.venues.filter((v) => v.id !== id) })),
-      saveReview: (review) =>
+        }));
+        if (backendReady) {
+          const payload = {
+            name: venue.name,
+            city: venue.city,
+            address: venue.address,
+            capacity: venue.capacity,
+            description: venue.description,
+            image: venue.image,
+          };
+          const call = exists ? api.updateVenue(venue.id, payload) : api.createVenue(payload);
+          void call.then(() => refreshFromBackend()).catch(() => {});
+        }
+      },
+      deleteVenue: (id) => {
+        setState((s) => ({ ...s, venues: s.venues.filter((v) => v.id !== id) }));
+        if (backendReady) void api.deleteVenue(id).then(() => refreshFromBackend()).catch(() => {});
+      },
+      saveReview: (review) => {
         setState((s) => ({
           ...s,
           reviews: s.reviews.some((r) => r.id === review.id)
             ? s.reviews.map((r) => (r.id === review.id ? review : r))
             : [review, ...s.reviews],
-        })),
-      deleteReview: (id) => setState((s) => ({ ...s, reviews: s.reviews.filter((r) => r.id !== id) })),
+        }));
+        if (backendReady) {
+          void api
+            .createReview({ eventId: review.eventId, rating: review.rating, comment: review.comment })
+            .then(() => refreshFromBackend())
+            .catch(() => {});
+        }
+      },
+      deleteReview: (id) => {
+        setState((s) => ({ ...s, reviews: s.reviews.filter((r) => r.id !== id) }));
+        if (backendReady) void api.deleteReview(id).then(() => refreshFromBackend()).catch(() => {});
+      },
       categoryById: (id) => state.categories.find((c) => c.id === id),
       venueById: (id) => state.venues.find((v) => v.id === id),
       eventById: (id) => state.events.find((e) => e.id === id),

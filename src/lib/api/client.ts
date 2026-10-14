@@ -71,7 +71,20 @@ export const api = {
 
   // --- catalog ---
   listCategories: () => request("/categories"),
+  createCategory: (body: unknown) => request("/categories", { method: "POST", body: JSON.stringify(body) }),
+  updateCategory: (id: string, body: unknown) =>
+    request(`/categories/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteCategory: (id: string) => request(`/categories/${id}`, { method: "DELETE" }),
   listVenues: () => request("/venues"),
+  createVenue: (body: unknown) => request("/venues", { method: "POST", body: JSON.stringify(body) }),
+  updateVenue: (id: string, body: unknown) =>
+    request(`/venues/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteVenue: (id: string) => request(`/venues/${id}`, { method: "DELETE" }),
+
+  // --- reviews ---
+  listReviews: (eventId?: string) => request(`/reviews${eventId ? `?eventId=${eventId}` : ""}`),
+  createReview: (body: unknown) => request("/reviews", { method: "POST", body: JSON.stringify(body) }),
+  deleteReview: (id: string) => request(`/reviews/${id}`, { method: "DELETE" }),
 
   // --- events ---
   listEvents: (params: Record<string, string> = {}) => {

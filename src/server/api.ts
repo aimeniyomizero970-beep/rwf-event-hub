@@ -25,6 +25,7 @@ import {
   serializeBooking,
   serializeCategory,
   serializeEvent,
+  serializeReview,
   serializeUser,
   serializeVenue,
 } from "./serialize";
@@ -77,7 +78,17 @@ const routes: Route[] = [
   route("GET", "/api/auth/me", me),
 
   route("GET", "/api/categories", listCategories),
+  route("POST", "/api/categories", createCategory),
+  route("PATCH", "/api/categories/:id", updateCategory),
+  route("DELETE", "/api/categories/:id", deleteCategory),
   route("GET", "/api/venues", listVenues),
+  route("POST", "/api/venues", createVenue),
+  route("PATCH", "/api/venues/:id", updateVenue),
+  route("DELETE", "/api/venues/:id", deleteVenue),
+
+  route("GET", "/api/reviews", listReviews),
+  route("POST", "/api/reviews", createReview),
+  route("DELETE", "/api/reviews/:id", deleteReview),
 
   route("GET", "/api/events", listEvents),
   route("POST", "/api/events", createEvent),
@@ -203,6 +214,128 @@ async function listCategories(ctx: Ctx): Promise<Response> {
 async function listVenues(ctx: Ctx): Promise<Response> {
   const rows = await ctx.db.from("venues").select("*").order("name").get();
   return json(rows.map(serializeVenue));
+}
+
+// --- Category / venue management (admin) -----------------------------------
+
+function slugify(value: string): string {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+async function createCategory(ctx: Ctx): Promise<Response> {
+  const session = await requireUser(ctx);
+  await requireRole(ctx, session.user, ["admin"]);
+  const input = (ctx.body ?? {}) as Record<string, unknown>;
+  if (!input.name) return fail("name is required");
+  const row = await ctx.db.from("categories").insertOne({
+    name: String(input.name),
+    slug: String(input.slug ?? slugify(String(input.name))),
+    description: String(input.description ?? ""),
+    image: String(input.image ?? ""),
+  });
+  return json(serializeCategory(row ?? {}), 201);
+}
+
+async function updateCategory(ctx: Ctx): Promise<Response> {
+  const session = await requireUser(ctx);
+  await requireRole(ctx, session.user, ["admin"]);
+  const input = (ctx.body ?? {}) as Record<string, unknown>;
+  const patch: Record<string, unknown> = {};
+  for (const key of ["name", "slug", "description", "image"]) {
+    if (key in input) patch[key] = input[key];
+  }
+  const row = await ctx.db.from("categories").eq("id", ctx.params.id).updateOne(patch);
+  if (!row) return fail("Category not found", 404);
+  return json(serializeCategory(row));
+}
+
+async function deleteCategory(ctx: Ctx): Promise<Response> {
+  const session = await requireUser(ctx);
+  await requireRole(ctx, session.user, ["admin"]);
+  await ctx.db.from("categories").eq("id", ctx.params.id).delete();
+  return json({ ok: true });
+}
+
+async function createVenue(ctx: Ctx): Promise<Response> {
+  const session = await requireUser(ctx);
+  await requireRole(ctx, session.user, ["admin"]);
+  const input = (ctx.body ?? {}) as Record<string, unknown>;
+  if (!input.name) return fail("name is required");
+  const row = await ctx.db.from("venues").insertOne({
+    name: String(input.name),
+    city: String(input.city ?? ""),
+    country: String(input.country ?? "Rwanda"),
+    address: String(input.address ?? ""),
+    capacity: Number(input.capacity ?? 0),
+    description: String(input.description ?? ""),
+    image: String(input.image ?? ""),
+  });
+  return json(serializeVenue(row ?? {}), 201);
+}
+
+async function updateVenue(ctx: Ctx): Promise<Response> {
+  const session = await requireUser(ctx);
+  await requireRole(ctx, session.user, ["admin"]);
+  const input = (ctx.body ?? {}) as Record<string, unknown>;
+  const patch: Record<string, unknown> = {};
+  for (const key of ["name", "city", "country", "address", "description", "image"]) {
+    if (key in input) patch[key] = input[key];
+  }
+  if ("capacity" in input) patch.capacity = Number(input.capacity ?? 0);
+  const row = await ctx.db.from("venues").eq("id", ctx.params.id).updateOne(patch);
+  if (!row) return fail("Venue not found", 404);
+  return json(serializeVenue(row));
+}
+
+async function deleteVenue(ctx: Ctx): Promise<Response> {
+  const session = await requireUser(ctx);
+  await requireRole(ctx, session.user, ["admin"]);
+  await ctx.db.from("venues").eq("id", ctx.params.id).delete();
+  return json({ ok: true });
+}
+
+// --- Reviews ---------------------------------------------------------------
+
+async function listReviews(ctx: Ctx): Promise<Response> {
+  const eventId = ctx.url.searchParams.get("eventId");
+  let query = ctx.db.from("reviews").select("*");
+  if (eventId) query = query.eq("event_id", eventId);
+  const rows = await query.order("created_at", { ascending: false }).get();
+  return json(rows.map(serializeReview));
+}
+
+async function createReview(ctx: Ctx): Promise<Response> {
+  const session = await requireUser(ctx);
+  const user = await ensureUserRow(ctx.db, session.user);
+  const userId = await userRowId(ctx.db, user);
+  const input = (ctx.body ?? {}) as Record<string, unknown>;
+  const eventId = String(input.eventId ?? "");
+  const rating = Number(input.rating ?? 0);
+  if (!eventId || rating < 1 || rating > 5) return fail("eventId and a rating of 1-5 are required");
+  const row = await ctx.db.from("reviews").insertOne({
+    event_id: eventId,
+    user_id: userId,
+    rating,
+    comment: String(input.comment ?? ""),
+  });
+  return json(serializeReview(row ?? {}), 201);
+}
+
+async function deleteReview(ctx: Ctx): Promise<Response> {
+  const session = await requireUser(ctx);
+  const user = await ensureUserRow(ctx.db, session.user);
+  const existing = await ctx.db.from("reviews").select("*").eq("id", ctx.params.id).maybeSingle();
+  if (!existing) return fail("Review not found", 404);
+  if (user.role !== "admin") {
+    const userId = await userRowId(ctx.db, user);
+    if (!userId || String(existing.user_id) !== userId) return fail("Not allowed", 403);
+  }
+  await ctx.db.from("reviews").eq("id", ctx.params.id).delete();
+  return json({ ok: true });
 }
 
 // --- Events ----------------------------------------------------------------

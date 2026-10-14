@@ -121,8 +121,18 @@ export function serializeUser(row: Row) {
   };
 }
 
-export function serializeAd(row: Row) {
+export function serializeReview(row: Row) {
   return {
+    id: str(row.id),
+    eventId: str(row.event_id),
+    userId: str(row.user_id),
+    rating: num(row.rating),
+    comment: str(row.comment),
+    createdAt: str(row.created_at),
+  };
+}
+
+export function serializeAd(row: Row) {  return {
     id: str(row.id),
     advertiser: str(row.advertiser),
     title: str(row.title),

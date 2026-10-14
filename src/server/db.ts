@@ -101,14 +101,14 @@ export class TableQuery<T = Record<string, unknown>> {
     return this;
   }
 
-  single(): this {
+  async single(): Promise<T> {
     this.singleMode = "one";
-    return this;
+    return (await this.run("GET")) as T;
   }
 
-  maybeSingle(): this {
+  async maybeSingle(): Promise<T | null> {
     this.singleMode = "maybe";
-    return this;
+    return (await this.run("GET")) as T | null;
   }
 
   private buildQueryString(): string {

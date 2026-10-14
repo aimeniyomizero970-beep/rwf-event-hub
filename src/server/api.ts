@@ -455,7 +455,8 @@ async function trackAd(ctx: Ctx): Promise<Response> {
   return json({ ok: true });
 }
 
-async function listFeeds(ctx: Ctx): Promise<Response> {  const session = await requireUser(ctx);
+async function listFeeds(ctx: Ctx): Promise<Response> {
+  const session = await requireUser(ctx);
   await requireRole(ctx, session.user, ["admin"]);
   const rows = await ctx.db.from("feed_sources").select("*").order("provider").get();
   return json(

@@ -46,11 +46,16 @@ export async function handlePaymentCreate(request: Request, rawEnv: unknown): Pr
   const eventId = String(body.eventId ?? "");
   const attendeeName = String(body.attendeeName ?? "Guest");
   const items = Array.isArray(body.items) ? (body.items as Record<string, unknown>[]) : [];
+  const amount = Number(body.amount ?? 0);
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return json({ ok: false, error: "Amount must be greater than zero" }, 400);
+  }
 
   const provider = env.paymentProvider as Provider;
   const reference = makeReference("pay");
 
-  const manualInstructions = manualInstruction(env, paymentMethod, Number(body.amount ?? 0), currency, reference);
+  const manualInstructions = manualInstruction(env, paymentMethod, amount, currency, reference);
 
   // Live provider path: needs items + a configured provider + a logged-in user.
   const canChargeLive = provider !== "manual" && items.length > 0 && eventId && hasSupabase(env);
@@ -74,7 +79,7 @@ export async function handlePaymentCreate(request: Request, rawEnv: unknown): Pr
       });
 
       const init = await initializePayment(env, {
-        amount: Number(body.amount ?? 0),
+        amount,
         currency,
         email: session.user.email,
         name: attendeeName,
@@ -112,7 +117,7 @@ export async function handlePaymentCreate(request: Request, rawEnv: unknown): Pr
     provider: env.paymentProvider,
     reference,
     paymentMethod,
-    amount: Number(body.amount ?? 0),
+    amount,
     currency,
     eventId,
     attendeeName,

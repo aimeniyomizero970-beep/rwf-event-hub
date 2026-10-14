@@ -36,19 +36,32 @@ const demoAccounts: Record<Role, string> = {
 };
 
 function LoginPage() {
-  const { users, setCurrentUser } = useEmbs();
+  const { users, setCurrentUser, backendReady, signInWithApi } = useEmbs();
   const navigate = useNavigate();
   const [role, setRole] = React.useState<Role>("customer");
   const [email, setEmail] = React.useState(demoAccounts.customer);
   const [password, setPassword] = React.useState("demo1234");
+  const [busy, setBusy] = React.useState(false);
 
   const pickRole = (r: Role) => {
     setRole(r);
     setEmail(demoAccounts[r]);
   };
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (backendReady) {
+      setBusy(true);
+      const res = await signInWithApi(email.trim(), password);
+      setBusy(false);
+      if (!res.user) {
+        toast.error(res.error ?? "Sign in failed");
+        return;
+      }
+      toast.success(`Welcome back, ${res.user.name}`);
+      void navigate({ to: dashboardFor[res.user.role] });
+      return;
+    }
     const user =
       users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase()) ??
       users.find((u) => u.role === role && u.status === "active");
@@ -108,8 +121,8 @@ function LoginPage() {
                   required
                 />
               </div>
-              <Button type="submit" className="w-full">
-                Sign in
+              <Button type="submit" className="w-full" disabled={busy}>
+                {busy ? "Signing in…" : "Sign in"}
               </Button>
             </form>
             <p className="mt-6 text-center text-sm text-muted-foreground">
@@ -119,7 +132,9 @@ function LoginPage() {
               </Link>
             </p>
             <p className="mt-3 rounded-md bg-muted p-3 text-center text-xs text-muted-foreground">
-              Demo mode: any password works. Accounts — customer@embs.rw, organizer@embs.rw, admin@embs.rw
+              {backendReady
+                ? "Live mode: sign in with the email and password you registered."
+                : "Demo mode: any password works. Accounts — customer@embs.rw, organizer@embs.rw, admin@embs.rw"}
             </p>
           </CardContent>
         </Card>

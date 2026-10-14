@@ -1,6 +1,7 @@
 import * as React from "react";
 import { seedState } from "./seed";
 import { bookingRef, randomId, ticketCode, txReference } from "./format";
+import { api, getBackendStatus } from "@/lib/api/client";
 import type {
   Booking,
   BookingItem,
@@ -31,9 +32,18 @@ interface CheckoutResult {
 
 interface EmbsContextValue extends EmbsState {
   currentUser: User | null;
+  backendReady: boolean;
   setCurrentUser: (id: string | null) => void;
   switchRole: (role: Role) => void;
   registerUser: (input: { name: string; email: string; role: Role }) => User;
+  signInWithApi: (email: string, password: string) => Promise<{ user?: User; error?: string }>;
+  signUpWithApi: (input: {
+    name: string;
+    email: string;
+    password: string;
+  }) => Promise<{ user?: User; error?: string; needsEmailConfirmation?: boolean }>;
+  signOutWithApi: () => Promise<void>;
+  refreshFromBackend: () => Promise<void>;
   checkout: (input: CheckoutInput) => CheckoutResult;
   cancelBooking: (bookingId: string) => void;
   toggleCheckIn: (ticketId: string) => void;
@@ -61,6 +71,7 @@ const EmbsContext = React.createContext<EmbsContextValue | null>(null);
 export function EmbsProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = React.useState<EmbsState>(() => seedState());
   const [hydrated, setHydrated] = React.useState(false);
+  const [backendReady, setBackendReady] = React.useState(false);
 
   React.useEffect(() => {
     try {
@@ -81,13 +92,93 @@ export function EmbsProvider({ children }: { children: React.ReactNode }) {
     }
   }, [state, hydrated]);
 
+  const refreshFromBackend = React.useCallback(async () => {
+    const status = await getBackendStatus(true);
+    const ready = Boolean(status?.supabase);
+    setBackendReady(ready);
+    if (!ready) return;
+
+    try {
+      const [cats, vens, evs, meRes] = await Promise.all([
+        api.listCategories(),
+        api.listVenues(),
+        api.listEvents(),
+        api.me(),
+      ]);
+
+      setState((s) => {
+        const next: EmbsState = { ...s };
+        if (cats.ok && Array.isArray(cats.data) && cats.data.length > 0) {
+          next.categories = cats.data as Category[];
+        }
+        if (vens.ok && Array.isArray(vens.data) && vens.data.length > 0) {
+          next.venues = vens.data as Venue[];
+        }
+        if (evs.ok && Array.isArray(evs.data)) {
+          next.events = evs.data as EventItem[];
+        }
+        const apiUser = meRes.ok ? ((meRes.data as { user?: User } | null)?.user ?? null) : null;
+        if (apiUser) {
+          next.users = s.users.some((u) => u.id === apiUser.id)
+            ? s.users.map((u) => (u.id === apiUser.id ? apiUser : u))
+            : [apiUser, ...s.users];
+          next.currentUserId = apiUser.id;
+        }
+        return next;
+      });
+    } catch {
+      /* keep local state on failure */
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (!hydrated) return;
+    void refreshFromBackend();
+  }, [hydrated, refreshFromBackend]);
+
   const value = React.useMemo<EmbsContextValue>(() => {
     const currentUser = state.users.find((u) => u.id === state.currentUserId) ?? null;
 
     return {
       ...state,
       currentUser,
+      backendReady,
+      refreshFromBackend,
       setCurrentUser: (id) => setState((s) => ({ ...s, currentUserId: id })),
+      signInWithApi: async (email, password) => {
+        const res = await api.login({ email, password });
+        const user = res.ok ? ((res.data as { user?: User } | null)?.user ?? null) : null;
+        if (!user) return { error: res.error ?? "Sign in failed" };
+        setState((s) => ({
+          ...s,
+          users: s.users.some((u) => u.id === user.id)
+            ? s.users.map((u) => (u.id === user.id ? user : u))
+            : [user, ...s.users],
+          currentUserId: user.id,
+        }));
+        return { user };
+      },
+      signUpWithApi: async ({ name, email, password }) => {
+        const res = await api.register({ name, email, password });
+        const payload = res.data as { user?: User; needsEmailConfirmation?: boolean } | null;
+        if (!res.ok) return { error: res.error ?? "Registration failed" };
+        const user = payload?.user ?? null;
+        if (payload?.needsEmailConfirmation || !user) {
+          return { user: user ?? undefined, needsEmailConfirmation: true };
+        }
+        setState((s) => ({
+          ...s,
+          users: s.users.some((u) => u.id === user.id)
+            ? s.users.map((u) => (u.id === user.id ? user : u))
+            : [user, ...s.users],
+          currentUserId: user.id,
+        }));
+        return { user };
+      },
+      signOutWithApi: async () => {
+        await api.logout();
+        setState((s) => ({ ...s, currentUserId: null }));
+      },
       switchRole: (role) =>
         setState((s) => {
           const target = s.users.find((u) => u.role === role && u.status === "active");
@@ -219,7 +310,7 @@ export function EmbsProvider({ children }: { children: React.ReactNode }) {
       eventById: (id) => state.events.find((e) => e.id === id),
       userById: (id) => state.users.find((u) => u.id === id),
     };
-  }, [state]);
+  }, [state, backendReady, refreshFromBackend]);
 
   return <EmbsContext.Provider value={value}>{children}</EmbsContext.Provider>;
 }

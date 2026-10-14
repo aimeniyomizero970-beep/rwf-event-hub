@@ -40,14 +40,33 @@ const roleCopy: { value: Role; title: string; body: string }[] = [
 ];
 
 function RegisterPage() {
-  const { registerUser } = useEmbs();
+  const { registerUser, backendReady, signUpWithApi } = useEmbs();
   const navigate = useNavigate();
   const [role, setRole] = React.useState<Role>("customer");
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (backendReady) {
+      setBusy(true);
+      const res = await signUpWithApi({ name: name.trim(), email: email.trim(), password });
+      setBusy(false);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      if (res.needsEmailConfirmation) {
+        toast.success("Account created — check your email to confirm before signing in.");
+        void navigate({ to: "/login" });
+        return;
+      }
+      toast.success(`Account created — welcome, ${res.user?.name ?? name}`);
+      void navigate({ to: dashboardFor[res.user?.role ?? role] });
+      return;
+    }
     const user = registerUser({ name: name.trim(), email: email.trim(), role });
     toast.success(`Account created — welcome, ${user.name}`);
     void navigate({ to: dashboardFor[role] });
@@ -84,7 +103,15 @@ function RegisterPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="pw">Password</Label>
-                <Input id="pw" type="password" required placeholder="••••••••" />
+                <Input
+                  id="pw"
+                  type="password"
+                  required
+                  minLength={backendReady ? 8 : undefined}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                />
               </div>
               <div className="space-y-2">
                 <Label>Account type</Label>
@@ -106,8 +133,8 @@ function RegisterPage() {
                   ))}
                 </RadioGroup>
               </div>
-              <Button type="submit" className="w-full">
-                Create account
+              <Button type="submit" className="w-full" disabled={busy}>
+                {busy ? "Creating account…" : "Create account"}
               </Button>
             </form>
             <p className="mt-6 text-center text-sm text-muted-foreground">

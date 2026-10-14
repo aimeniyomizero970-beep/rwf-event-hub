@@ -19,9 +19,9 @@ import { cn } from "@/lib/utils";
 const STEPS = ["Ticket tier", "Quantity", "Summary", "Payment", "Confirmation"];
 
 const bankName = import.meta.env.VITE_BANK_NAME ?? "BK";
-const bankAccount = import.meta.env.VITE_BANK_ACCOUNT ?? "";
-const momoAccount = import.meta.env.VITE_MOMO_ACCOUNT ?? "";
-const momoPhone = import.meta.env.VITE_MOMO_PHONE ?? "";
+const bankAccount = import.meta.env.VITE_BANK_ACCOUNT ?? "100258706767";
+const momoAccount = import.meta.env.VITE_MOMO_ACCOUNT ?? "1256231";
+const momoPhone = import.meta.env.VITE_MOMO_PHONE ?? "0798528250";
 
 const METHODS: { value: PaymentMethod; hint: string; icon: React.ReactNode }[] = [
   { value: "MTN MoMo", hint: "Mobile money prompt to your MTN line", icon: <Smartphone className="size-4" /> },
@@ -51,7 +51,7 @@ export function BookingModal({
   onOpenChange: (open: boolean) => void;
   initialTierId?: string;
 }) {
-  const { checkout, currentUser, venueById } = useEmbs();
+  const { checkout, currentUser, venueById, backendReady } = useEmbs();
   const venue = venueById(event.venueId);
   const [step, setStep] = React.useState(0);
   const [tierId, setTierId] = React.useState(initialTierId ?? event.tiers[0]?.id ?? "");
@@ -90,6 +90,19 @@ export function BookingModal({
     setProcessing(true);
     setPaymentNotice(null);
 
+    const items = [{ tierId: tier.id, tierName: tier.name, qty, price: tier.price }];
+    const attendeeName = attendee.trim() || currentUser?.name || "Guest";
+
+    // Demo mode (backend not configured): complete the booking locally.
+    if (!backendReady) {
+      const res = checkout({ eventId: event.id, items, paymentMethod: method, attendeeName });
+      setResult(res);
+      setProcessing(false);
+      setStep(4);
+      toast.success(`Booking confirmed — ${res.tickets.length} ticket(s) issued`);
+      return;
+    }
+
     try {
       const response = await fetch("/api/payments/create", {
         method: "POST",
@@ -99,9 +112,8 @@ export function BookingModal({
           amount: total,
           currency: "RWF",
           paymentMethod: method,
-          attendeeName: attendee.trim() || currentUser?.name || "Guest",
-          tierName: tier.name,
-          qty,
+          attendeeName,
+          items,
         }),
       });
 
@@ -115,13 +127,13 @@ export function BookingModal({
         return;
       }
 
-      if (data.status === "pending_manual_confirmation" || data.status === "pending_provider_setup") {
+      if (data.status === "pending_manual_confirmation" || data.status === "pending_provider_setup" || data.status === "pending") {
         setPaymentNotice({
           status: data.status,
-          message: data.message,
+          message: data.message ?? "Awaiting payment confirmation.",
           instructions: data.instructions,
         });
-        toast.info(data.message);
+        toast.info(data.message ?? "Awaiting payment confirmation.");
         setProcessing(false);
         return;
       }
@@ -129,9 +141,9 @@ export function BookingModal({
       if (data.status === "approved") {
         const res = checkout({
           eventId: event.id,
-          items: [{ tierId: tier.id, tierName: tier.name, qty, price: tier.price }],
+          items,
           paymentMethod: method,
-          attendeeName: attendee.trim() || currentUser?.name || "Guest",
+          attendeeName,
         });
         setResult(res);
         setProcessing(false);

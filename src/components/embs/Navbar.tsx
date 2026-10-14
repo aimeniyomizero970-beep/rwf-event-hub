@@ -32,7 +32,7 @@ const dashboardFor: Record<Role, string> = {
 };
 
 export function Navbar() {
-  const { currentUser, switchRole, setCurrentUser } = useEmbs();
+  const { currentUser, switchRole, setCurrentUser, backendReady, signOutWithApi } = useEmbs();
   const navigate = useNavigate();
   const [open, setOpen] = React.useState(false);
 
@@ -105,7 +105,8 @@ export function Navbar() {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => {
-                    setCurrentUser(null);
+                    if (backendReady) void signOutWithApi();
+                    else setCurrentUser(null);
                     toast.success("Signed out");
                     void navigate({ to: "/" });
                   }}

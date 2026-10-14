@@ -312,6 +312,43 @@ begin
   return v_booking_id;
 end $$;
 
+-- --- confirm_booking (called after verified payment) -----------------------
+create or replace function public.confirm_booking(p_booking_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.bookings
+    set status = 'confirmed', updated_at = now()
+    where id = p_booking_id and status <> 'confirmed';
+end $$;
+
+-- --- fail_booking (release inventory on failed/expired payment) ------------
+create or replace function public.fail_booking(p_booking_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_item record;
+begin
+  if exists (select 1 from public.bookings where id = p_booking_id and status = 'confirmed') then
+    return;
+  end if;
+
+  for v_item in select * from public.booking_items where booking_id = p_booking_id loop
+    update public.ticket_tiers
+      set sold = greatest(0, sold - v_item.qty)
+      where id = v_item.tier_id;
+  end loop;
+
+  delete from public.tickets where booking_id = p_booking_id;
+  update public.bookings set status = 'cancelled', updated_at = now() where id = p_booking_id;
+end $$;
+
 -- =============================================================================
 -- Row Level Security
 -- The server uses the service-role key (bypasses RLS) for all writes and for

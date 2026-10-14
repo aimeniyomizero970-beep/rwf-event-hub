@@ -74,9 +74,9 @@ export function readEnv(env: RuntimeEnvInput): AppEnv {
     muxSigningKeyId: pick(runtime, "MUX_SIGNING_KEY_ID"),
     muxSigningPrivateKey: pick(runtime, "MUX_SIGNING_PRIVATE_KEY"),
     bankName: pick(runtime, "BANK_NAME") || "BK",
-    bankAccount: pick(runtime, "BANK_ACCOUNT") || "100258706767",
-    momoAccount: pick(runtime, "MOMO_ACCOUNT") || "1256231",
-    momoPhone: pick(runtime, "MOMO_PHONE") || "0798528250",
+    bankAccount: pick(runtime, "BANK_ACCOUNT") || "",
+    momoAccount: pick(runtime, "MOMO_ACCOUNT") || "",
+    momoPhone: pick(runtime, "MOMO_PHONE") || "",
   };
 }
 

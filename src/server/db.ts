@@ -29,6 +29,7 @@ export class TableQuery<T = Record<string, unknown>> {
   private limitValue: number | null = null;
   private selectClause = "*";
   private singleMode: "none" | "one" | "maybe" = "none";
+  private onConflict = "";
 
   constructor(
     private readonly base: string,
@@ -116,6 +117,7 @@ export class TableQuery<T = Record<string, unknown>> {
     for (const f of this.filters) params.set(f.column, `${f.op}.${f.value}`);
     if (this.orderClause) params.set("order", this.orderClause);
     if (this.limitValue !== null) params.set("limit", String(this.limitValue));
+    if (this.onConflict) params.set("on_conflict", this.onConflict);
     const qs = params.toString();
     return qs ? `?${qs}` : "";
   }
@@ -166,6 +168,16 @@ export class TableQuery<T = Record<string, unknown>> {
   async insertOne(row: Partial<T>): Promise<T | null> {
     const rows = await this.insert(row);
     return rows[0] ?? null;
+  }
+
+  async upsert(rows: Partial<T> | Partial<T>[], onConflict: string): Promise<T[]> {
+    this.onConflict = onConflict;
+    const data = (await this.run(
+      "POST",
+      rows,
+      "resolution=merge-duplicates,return=representation",
+    )) as T[];
+    return Array.isArray(data) ? data : data ? [data] : [];
   }
 
   async update(patch: Partial<T>): Promise<T[]> {

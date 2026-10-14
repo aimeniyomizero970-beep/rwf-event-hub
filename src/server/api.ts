@@ -7,6 +7,7 @@
 
 import { Db, DbError } from "./db";
 import { readEnv, hasSupabase, type AppEnv } from "./env";
+import { syncTicketmaster } from "./feeds/ticketmaster";
 import {
   AuthError,
   ensureUserRow,
@@ -87,6 +88,8 @@ const routes: Route[] = [
   route("POST", "/api/bookings", createBooking),
 
   route("GET", "/api/ads", listAds),
+  route("GET", "/api/feeds", listFeeds),
+  route("POST", "/api/feeds/ticketmaster/sync", syncTicketmasterFeed),
   route("GET", "/api/health", health),
 ];
 
@@ -380,6 +383,34 @@ async function listAds(ctx: Ctx): Promise<Response> {
   if (placement) query = query.eq("placement", placement);
   const rows = await query.order("weight", { ascending: false }).get();
   return json(rows.map(serializeAd));
+}
+
+async function listFeeds(ctx: Ctx): Promise<Response> {
+  const session = await requireUser(ctx);
+  await requireRole(ctx, session.user, ["admin"]);
+  const rows = await ctx.db.from("feed_sources").select("*").order("provider").get();
+  return json(
+    rows.map((r) => ({
+      provider: String(r.provider),
+      name: String(r.name),
+      enabled: r.enabled === true,
+      lastSyncedAt: r.last_synced_at ? String(r.last_synced_at) : null,
+    })),
+  );
+}
+
+async function syncTicketmasterFeed(ctx: Ctx): Promise<Response> {
+  const session = await requireUser(ctx);
+  await requireRole(ctx, session.user, ["admin"]);
+  const input = (ctx.body ?? {}) as Record<string, unknown>;
+  const result = await syncTicketmaster(ctx.env, ctx.db, {
+    city: input.city ? String(input.city) : ctx.url.searchParams.get("city") ?? undefined,
+    keyword: input.keyword ? String(input.keyword) : undefined,
+    countryCode: input.countryCode ? String(input.countryCode) : undefined,
+    size: input.size ? Number(input.size) : undefined,
+    pages: input.pages ? Number(input.pages) : undefined,
+  });
+  return json({ ok: true, ...result });
 }
 
 async function health(ctx: Ctx): Promise<Response> {

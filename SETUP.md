@@ -57,6 +57,9 @@ the `VITE_*` mirrors and bank/MoMo display details used by the front end. See
 
 - `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`
 - `GET /api/events`, `GET /api/events/:id`, `POST/PATCH/DELETE /api/events[/:id]`
+- `GET/POST /api/categories`, `PATCH/DELETE /api/categories/:id` (admin)
+- `GET/POST /api/venues`, `PATCH/DELETE /api/venues/:id` (admin)
+- `GET/POST /api/reviews`, `DELETE /api/reviews/:id`
 - `GET /api/bookings`, `POST /api/bookings`
 - `GET /api/ads`, `POST/PATCH/DELETE /api/ads[/:id]`, `POST /api/ads/:id/track`
 - `POST /api/payments/create`, `POST /api/payments/webhook/:provider`

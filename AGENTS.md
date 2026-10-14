@@ -41,3 +41,13 @@ Kigali Events Hub — an Event Management and Booking System (EMBS) web app.
 - Schema, RLS policies and RPC functions live in `supabase/schema.sql`.
 - Setup instructions for accounts/keys are in `SETUP.md`.
 
+### Frontend wiring status
+
+- Wired to the API (when Supabase is configured): auth (login/register/logout/me),
+  catalog hydration (categories, venues, events, reviews), event create/update/
+  delete/status/featured, category & venue CRUD, reviews create/delete, and
+  `POST /api/payments/create` (manual + live providers).
+- Still local-only (no UI yet): ads (no display), Ticketmaster feed sync trigger,
+  and live-stream watching/management.
+- Without Supabase the store runs fully in local demo mode on `localStorage`.
+

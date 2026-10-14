@@ -19,9 +19,9 @@ import { cn } from "@/lib/utils";
 const STEPS = ["Ticket tier", "Quantity", "Summary", "Payment", "Confirmation"];
 
 const bankName = import.meta.env.VITE_BANK_NAME ?? "BK";
-const bankAccount = import.meta.env.VITE_BANK_ACCOUNT ?? "100258706767";
-const momoAccount = import.meta.env.VITE_MOMO_ACCOUNT ?? "1256231";
-const momoPhone = import.meta.env.VITE_MOMO_PHONE ?? "0798528250";
+const bankAccount = import.meta.env.VITE_BANK_ACCOUNT ?? "";
+const momoAccount = import.meta.env.VITE_MOMO_ACCOUNT ?? "";
+const momoPhone = import.meta.env.VITE_MOMO_PHONE ?? "";
 
 const METHODS: { value: PaymentMethod; hint: string; icon: React.ReactNode }[] = [
   { value: "MTN MoMo", hint: "Mobile money prompt to your MTN line", icon: <Smartphone className="size-4" /> },

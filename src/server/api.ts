@@ -8,6 +8,7 @@
 import { Db, DbError } from "./db";
 import { readEnv, hasSupabase, type AppEnv } from "./env";
 import { syncTicketmaster } from "./feeds/ticketmaster";
+import { createLiveStream, endLiveStream, getStreamForEvent, signPlaybackUrl } from "./streaming";
 import {
   AuthError,
   ensureUserRow,
@@ -88,8 +89,17 @@ const routes: Route[] = [
   route("POST", "/api/bookings", createBooking),
 
   route("GET", "/api/ads", listAds),
+  route("POST", "/api/ads", createAd),
+  route("PATCH", "/api/ads/:id", updateAd),
+  route("DELETE", "/api/ads/:id", deleteAd),
+  route("POST", "/api/ads/:id/track", trackAd),
   route("GET", "/api/feeds", listFeeds),
   route("POST", "/api/feeds/ticketmaster/sync", syncTicketmasterFeed),
+
+  route("POST", "/api/streams", createStream),
+  route("POST", "/api/streams/:id/end", endStream),
+  route("GET", "/api/streams/:eventId", getStream),
+
   route("GET", "/api/health", health),
 ];
 
@@ -385,8 +395,67 @@ async function listAds(ctx: Ctx): Promise<Response> {
   return json(rows.map(serializeAd));
 }
 
-async function listFeeds(ctx: Ctx): Promise<Response> {
+async function createAd(ctx: Ctx): Promise<Response> {
   const session = await requireUser(ctx);
+  await requireRole(ctx, session.user, ["admin"]);
+  const input = (ctx.body ?? {}) as Record<string, unknown>;
+  if (!input.title || !input.advertiser) return fail("advertiser and title are required");
+  const row = await ctx.db.from("ads").insertOne({
+    advertiser: String(input.advertiser),
+    title: String(input.title),
+    body: String(input.body ?? ""),
+    image: String(input.image ?? ""),
+    target_url: String(input.targetUrl ?? ""),
+    placement: String(input.placement ?? "home_banner"),
+    starts_at: input.startsAt ? String(input.startsAt) : new Date().toISOString(),
+    ends_at: input.endsAt ? String(input.endsAt) : null,
+    active: input.active === undefined ? true : Boolean(input.active),
+    weight: Number(input.weight ?? 1),
+  });
+  return json(serializeAd(row ?? {}), 201);
+}
+
+async function updateAd(ctx: Ctx): Promise<Response> {
+  const session = await requireUser(ctx);
+  await requireRole(ctx, session.user, ["admin"]);
+  const input = (ctx.body ?? {}) as Record<string, unknown>;
+  const patch: Record<string, unknown> = {};
+  const map: Record<string, string> = {
+    advertiser: "advertiser",
+    title: "title",
+    body: "body",
+    image: "image",
+    targetUrl: "target_url",
+    placement: "placement",
+    startsAt: "starts_at",
+    endsAt: "ends_at",
+    active: "active",
+    weight: "weight",
+  };
+  for (const [from, to] of Object.entries(map)) {
+    if (from in input) patch[to] = input[from];
+  }
+  const row = await ctx.db.from("ads").eq("id", ctx.params.id).updateOne(patch);
+  if (!row) return fail("Ad not found", 404);
+  return json(serializeAd(row));
+}
+
+async function deleteAd(ctx: Ctx): Promise<Response> {
+  const session = await requireUser(ctx);
+  await requireRole(ctx, session.user, ["admin"]);
+  await ctx.db.from("ads").eq("id", ctx.params.id).delete();
+  return json({ ok: true });
+}
+
+async function trackAd(ctx: Ctx): Promise<Response> {
+  const input = (ctx.body ?? {}) as Record<string, unknown>;
+  const field = String(input.field ?? "impressions");
+  if (field !== "impressions" && field !== "clicks") return fail("field must be impressions or clicks");
+  await ctx.db.rpc("track_ad", { p_ad_id: ctx.params.id, p_field: field });
+  return json({ ok: true });
+}
+
+async function listFeeds(ctx: Ctx): Promise<Response> {  const session = await requireUser(ctx);
   await requireRole(ctx, session.user, ["admin"]);
   const rows = await ctx.db.from("feed_sources").select("*").order("provider").get();
   return json(
@@ -411,6 +480,54 @@ async function syncTicketmasterFeed(ctx: Ctx): Promise<Response> {
     pages: input.pages ? Number(input.pages) : undefined,
   });
   return json({ ok: true, ...result });
+}
+
+async function createStream(ctx: Ctx): Promise<Response> {
+  const session = await requireUser(ctx);
+  await requireRole(ctx, session.user, ["organizer", "admin"]);
+  const input = (ctx.body ?? {}) as Record<string, unknown>;
+  const eventId = String(input.eventId ?? "");
+  if (!eventId) return fail("eventId is required");
+  const event = await ctx.db.from("events").select("id").eq("id", eventId).maybeSingle();
+  if (!event) return fail("Event not found", 404);
+
+  const result = await createLiveStream(ctx.env, ctx.db, {
+    eventId,
+    isPublic: input.isPublic === undefined ? true : Boolean(input.isPublic),
+    price: Number(input.price ?? 0),
+  });
+  return json({ ok: true, ...result }, 201);
+}
+
+async function getStream(ctx: Ctx): Promise<Response> {
+  const stream = await getStreamForEvent(ctx.db, ctx.params.eventId);
+  if (!stream) return fail("No stream for this event", 404);
+
+  const playbackId = stream.playback_id ? String(stream.playback_id) : null;
+  const isPublic = stream.is_public === true;
+  let playbackUrl: string | null = playbackId ? `https://stream.mux.com/${playbackId}.m3u8` : null;
+
+  if (!isPublic) {
+    const session = await resolveSession(ctx.env, ctx.request);
+    if (!session) return fail("Sign in to watch this stream", 401);
+    if (playbackId) playbackUrl = await signPlaybackUrl(ctx.env, playbackId, { audience: "v" });
+  }
+
+  return json({
+    eventId: ctx.params.eventId,
+    status: String(stream.status),
+    isPublic,
+    price: Number(stream.price ?? 0),
+    playbackUrl,
+  });
+}
+
+async function endStream(ctx: Ctx): Promise<Response> {
+  const session = await requireUser(ctx);
+  await requireRole(ctx, session.user, ["organizer", "admin"]);
+  const ok = await endLiveStream(ctx.env, ctx.db, ctx.params.id);
+  if (!ok) return fail("Stream not found", 404);
+  return json({ ok: true });
 }
 
 async function health(ctx: Ctx): Promise<Response> {

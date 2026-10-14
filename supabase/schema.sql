@@ -349,6 +349,21 @@ begin
   update public.bookings set status = 'cancelled', updated_at = now() where id = p_booking_id;
 end $$;
 
+-- --- track_ad (atomic impression/click counters) ---------------------------
+create or replace function public.track_ad(p_ad_id uuid, p_field text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if p_field = 'impressions' then
+    update public.ads set impressions = impressions + 1 where id = p_ad_id;
+  elsif p_field = 'clicks' then
+    update public.ads set clicks = clicks + 1 where id = p_ad_id;
+  end if;
+end $$;
+
 -- =============================================================================
 -- Row Level Security
 -- The server uses the service-role key (bypasses RLS) for all writes and for

@@ -4,6 +4,7 @@ import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { handleApi } from "./server/api";
 import { handlePaymentCreate, handlePaymentWebhook } from "./server/paymentRoutes";
+import { handleMuxWebhook } from "./server/streaming";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -58,6 +59,10 @@ export default {
       if (url.pathname.startsWith("/api/payments/webhook/")) {
         const provider = url.pathname.split("/").filter(Boolean).pop() ?? "";
         return handlePaymentWebhook(request, env, provider);
+      }
+
+      if (url.pathname === "/api/mux/webhook") {
+        return handleMuxWebhook(request, env);
       }
 
       const apiResponse = await handleApi(request, env);
